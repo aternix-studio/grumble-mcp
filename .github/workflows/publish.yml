@@ -1,0 +1,26 @@
+# Publishes to npm when a version is tagged (v0.2.0 and so on), with npm's trusted publishing: npm trusts this workflow
+# in this repository, so there's no token to keep and nobody signs in. The tag has to match package.json's version, and
+# the tests have to pass. npm adds provenance, showing it was built here from this commit.
+name: Publish
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      - name: The tag is package.json's version
+        run: test "v$(node -p 'require("./package.json").version')" = "$GITHUB_REF_NAME"
+      - run: npm ci
+      - run: npm test
+      # (trusted publishing needs npm 11.5.1 or later)
+      - run: npm install -g npm@latest
+      - run: npm publish --access public
