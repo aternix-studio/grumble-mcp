@@ -23,4 +23,5 @@ jobs:
       - run: npm test
       # (trusted publishing needs npm 11.5.1 or later)
       - run: npm install -g npm@latest
-      - run: npm publish --access public
+      # (verbose: when npm won't take this workflow's word, it says why here, rather than only a 404)
+      - run: npm publish --access public --loglevel verbose
