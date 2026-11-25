@@ -37,6 +37,7 @@ test("a coding agent uses Grumble through grumble-mcp", async () => {
 		assert.deepEqual(
 			tools.map((t) => t.name).sort(),
 			[
+				"grumble_attachment",
 				"grumble_channels",
 				"grumble_draft",
 				"grumble_join_voice",
@@ -79,7 +80,7 @@ test("a coding agent uses Grumble through grumble-mcp", async () => {
 		assert.match((await call("grumble_channels", {server_id: "@me"})).text, /500 {2}DM {2}Squish/);
 		const read = await call("grumble_read", {channel_id: "200"});
 		assert.match(read.text, /\[2026-11-11 08:00\] Wren \(@wren\): morning/);
-		assert.match(read.text, /Squish \(@squish_mishu\): look at this \[attached: building\.mp4\]/);
+		assert.match(read.text, /Squish \(@squish_mishu\): look at this \[attached: building\.mp4 #0, shot\.png #1\]/);
 		assert.match((await call("grumble_read", {channel_id: "200", limit: 1})).text, /look at this/);
 		assert.equal((await call("grumble_read", {channel_id: "abc"})).error, true, "ids are checked");
 
@@ -96,6 +97,20 @@ test("a coding agent uses Grumble through grumble-mcp", async () => {
 		assert.match((await call("grumble_set_voice", {mute: true})).text, /You're muted/);
 		assert.match((await call("grumble_leave_voice")).text, /Left voice/);
 		assert.match((await call("grumble_open", {channel_id: "500"})).text, /Opened/);
+
+		// what's attached, by its place: a picture to look at, words as words, anything else saved here (23 Nov: "u should
+		// be abel to do absolutely everything i can do and see thru the mcp")
+		assert.match((await call("grumble_read", {channel_id: "200"})).text, /look at this \[attached: building\.mp4 #0, shot\.png #1\] \(2\)/);
+		const pic = await client.callTool({name: "grumble_attachment", arguments: {channel_id: "200", message_id: "2", index: 1}});
+		assert.equal(pic.content[1].type, "image");
+		assert.equal(pic.content[1].mimeType, "image/png");
+		assert.match(pic.content[0].text, /shot\.png \(image\/png/);
+		assert.match((await call("grumble_attachment", {channel_id: "200", message_id: "2", index: 2})).text, /notes\.txt .*:\nthe lines stop after a while/);
+		const kept = (await call("grumble_attachment", {channel_id: "200", message_id: "2"})).text;
+		const at = kept.match(/saved at (.+)$/)?.[1];
+		assert.equal(fs.readFileSync(at, "utf8"), "not really a video");
+		// a forum: its posts, each read as a channel
+		assert.match((await call("grumble_read", {channel_id: "600"})).text, /its posts, newest first .*\n601 {2}Whiteboard stops drawing {2}2 replies/);
 
 		// further back, what's unread, and search
 		assert.match((await call("grumble_read", {channel_id: "200", before: "2"})).text, /morning \(1\)/);

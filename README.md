@@ -37,7 +37,8 @@ press Allow.
 | `grumble_whoami` | Who's signed in, and what this tool may do |
 | `grumble_servers` | Your servers |
 | `grumble_channels` | A server's channels, or your DMs with `"@me"` |
-| `grumble_read` | The latest messages in a channel or DM (encrypted ones opened as you see them), or with `before`, further back |
+| `grumble_read` | The latest messages in a channel or DM (encrypted ones opened as you see them), or with `before`, further back; a forum's posts |
+| `grumble_attachment` | A file on a message, opened as you see it: a picture to look at, a text file's words, anything else saved on your computer |
 | `grumble_open` | Shows a channel or DM in Grumble |
 | `grumble_watch` | Starts or stops keeping new messages in a channel |
 | `grumble_new_messages` | New messages in watched channels since last asked |

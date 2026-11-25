@@ -2,6 +2,7 @@
 // It never sends anything as you (Grumble's developer terms keep automating to bots): a message is drafted in the box
 // for you to send.
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import {z} from "zod";
 
@@ -10,9 +11,9 @@ const text = (t) => ({content: [{type: "text", text: t}]});
 const nameOf = (u) => (u ? (u.global_name && u.global_name !== u.username ? `${u.global_name} (@${u.username})` : `@${u.username}`) : "someone");
 const when = (iso) => (iso ? new Date(iso).toISOString().replace("T", " ").slice(0, 16) : "");
 
-/** A message as a line: when, who, what (and what's attached). */
+/** A message as a line: when, who, what (and what's attached, each with its place for grumble_attachment). */
 export function line(m) {
-	const files = (m.attachments ?? []).map((a) => a.filename).filter(Boolean);
+	const files = (m.attachments ?? []).map((a, i) => (a.filename ? `${a.filename} #${a.index ?? i}` : "")).filter(Boolean);
 	const extra = files.length ? ` [attached: ${files.join(", ")}]` : "";
 	const embeds = (m.embeds ?? []).length && !m.content ? " [a link or embed]" : "";
 	return `[${when(m.timestamp)}] ${nameOf(m.author)}: ${m.content || ""}${extra}${embeds}`.trim();
@@ -77,7 +78,43 @@ export function registerTools(server, grumble) {
 			const c = await grumble.ask("GET_CHANNEL", {channel_id, ...(before ? {before} : {})}, {timeout: 60_000});
 			const msgs = (c.messages ?? []).slice(-limit);
 			const head = `${KINDS[c.type] ?? "channel"} ${c.name ? `#${c.name}` : ""} (${c.id})`;
+			// (a forum holds posts: each one's title and id, to read as a channel of its own)
+			if (Array.isArray(c.threads))
+				return text(
+					c.threads.length
+						? `${head}, its posts, newest first (read one with grumble_read and its id):\n${c.threads.map((t) => `${t.id}  ${t.name}  ${t.message_count} ${t.message_count === 1 ? "reply" : "replies"}${t.archived ? "  (closed)" : ""}`).join("\n")}`
+						: `${head}: no posts.`,
+				);
 			return text(msgs.length ? `${head}\n${msgs.map((m) => `${line(m)} (${m.id})`).join("\n")}` : `${head}: no ${before ? "earlier " : ""}messages.`);
+		},
+	);
+
+	tool(
+		"grumble_attachment",
+		"A file attached to a message, as you'd see it in Grumble (an encrypted one opened on your computer): a picture comes back to look at, a text file as its words, anything else saved on this computer and its path given. index is its place among the message's files (grumble_read shows each as #0, #1...).",
+		{
+			channel_id: id,
+			message_id: id,
+			index: z.number().int().min(0).max(9).optional().describe("Which of the message's files, from 0 (0 if not said)"),
+		},
+		async ({channel_id, message_id, index = 0}) => {
+			if (!grumble.may("messages.read")) return text(notAllowed("read messages"));
+			const f = await newer("GET_ATTACHMENT", {channel_id, message_id, index}, {timeout: 120_000});
+			const type = f.content_type ?? "application/octet-stream";
+			const about = `${f.filename} (${type}, ${f.size < 1024 ? `${f.size} bytes` : `${Math.round(f.size / 1024)} KB`})`;
+			// a picture, to look at (the kinds agents can see)
+			if (/^image\/(png|jpeg|gif|webp)$/.test(type)) return {content: [{type: "text", text: about}, {type: "image", data: f.data, mimeType: type}]};
+			// words, as words (the first hundred thousand characters)
+			if (/^text\/|json|xml|javascript|csv|yaml|markdown/.test(type)) {
+				const words = Buffer.from(f.data, "base64").toString("utf8");
+				return text(`${about}:\n${words.slice(0, 100_000)}${words.length > 100_000 ? "\n(cut short)" : ""}`);
+			}
+			// anything else: on this computer, readable only by you
+			const dir = path.join(os.tmpdir(), "grumble-mcp", message_id);
+			await fs.mkdir(dir, {recursive: true, mode: 0o700});
+			const at = path.join(dir, path.basename(f.filename || `file-${index}`));
+			await fs.writeFile(at, Buffer.from(f.data, "base64"), {mode: 0o600});
+			return text(`${about}, saved at ${at}`);
 		},
 	);
 

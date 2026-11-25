@@ -71,13 +71,16 @@ export async function fakeGrumble(dir) {
 					if (a.guild_id !== "100") return refuse(4003, "Invalid guild id");
 					return reply({channels: [{id: "200", name: "general", type: 0}, {id: "201", name: "Lounge", type: 2}]});
 				case "GET_CHANNEL":
+					// a forum: its posts
+					if (a.channel_id === "600")
+						return reply({id: "600", name: "bug-reports", type: 15, messages: [], threads: [{id: "601", name: "Whiteboard stops drawing", message_count: 2, archived: false}]});
 					return reply({
 						id: a.channel_id,
 						name: a.channel_id === "500" ? "" : "general",
 						type: a.channel_id === "500" ? 1 : 0,
 						messages: [
 							{id: "1", content: "morning", author: me, timestamp: "2026-11-11T08:00:00.000Z", attachments: []},
-							{id: "2", content: "look at this", author: {id: "7", username: "squish_mishu", global_name: "Squish"}, timestamp: "2026-11-11T08:01:00.000Z", attachments: [{filename: "building.mp4"}]},
+							{id: "2", content: "look at this", author: {id: "7", username: "squish_mishu", global_name: "Squish"}, timestamp: "2026-11-11T08:01:00.000Z", attachments: [{filename: "building.mp4", index: 0}, {filename: "shot.png", index: 1}]},
 						],
 					});
 				case "SUBSCRIBE":
@@ -98,13 +101,22 @@ export async function fakeGrumble(dir) {
 					return reply({mute: !!a.mute, deaf: !!a.deaf});
 			}
 			// Grumble's own
-			const ours = {GET_UNREAD: "rpc", SEARCH_MESSAGES: "messages.read", DRAFT_MESSAGE: "messages.draft", GET_STATUS: "rpc", SET_STATUS: "rpc.status.write", CREATE_CREATION: "creations.write", GET_CREATIONS: "creations.write", OPEN_CREATION: "creations.write"};
+			const ours = {GET_UNREAD: "rpc", SEARCH_MESSAGES: "messages.read", DRAFT_MESSAGE: "messages.draft", GET_STATUS: "rpc", SET_STATUS: "rpc.status.write", CREATE_CREATION: "creations.write", GET_CREATIONS: "creations.write", OPEN_CREATION: "creations.write", GET_ATTACHMENT: "messages.read"};
 			if (f.cmd in ours && !how.old) {
 				if (!scopes.includes(ours[f.cmd])) return refuse(4006, "Not authenticated or invalid scope");
 				seen.args[f.cmd] = a;
 				switch (f.cmd) {
 					case "GET_UNREAD":
 						return reply({channels: [{id: "200", name: "general", type: 0, guild_id: "100", guild_name: "Night Owls", mentions: 2, muted: false}, {id: "500", name: "Squish", type: 1, guild_id: null, guild_name: null, mentions: 0, muted: true}]});
+					case "GET_ATTACHMENT": {
+						const files = [
+							{filename: "building.mp4", content_type: "video/mp4", data: Buffer.from("not really a video").toString("base64")},
+							{filename: "shot.png", content_type: "image/png", data: "iVBORw0KGgo="},
+							{filename: "notes.txt", content_type: "text/plain", data: Buffer.from("the lines stop after a while").toString("base64")},
+						];
+						const f = files[a.index ?? 0];
+						return f ? reply({...f, size: Buffer.from(f.data, "base64").length}) : refuse(4000, "That message has 3 files (from 0)");
+					}
 					case "SEARCH_MESSAGES":
 						return reply({total: 1, messages: [{id: "9", channel_id: "200", channel_name: "general", content: "the build passed", author: me, timestamp: "2026-11-10T09:00:00.000Z", attachments: []}]});
 					case "DRAFT_MESSAGE":

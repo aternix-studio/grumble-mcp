@@ -1,6 +1,6 @@
 {
   "name": "grumble-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Use Grumble from your coding agent: read and search your messages, see what's unread, watch channels, see notifications, control voice, set your status, draft messages for you to send, and make themes and cosmetics, through the Grumble desktop app on your computer (MCP server).",
   "keywords": ["grumble", "mcp", "model-context-protocol", "claude", "cursor", "agent", "chat"],
   "homepage": "https://grumble.gg/developers/docs/#coding-agents",
